@@ -5,7 +5,7 @@ Resources:
   MyWAFACL:
     Type: AWS::WAFv2::WebACL
     Properties:
-      Name: WebACLforproarch1
+      Name: WebACLforproarch123
       Description: This is an example WebACL
       Scope: CLOUDFRONT
       DefaultAction:
@@ -34,14 +34,14 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       # Change bucket name to reflect your website
-      BucketName: s3proarch1.com
+      BucketName: s3proarch123.com
 
   # s3 bucket for for lambda authorizer code
 
   lambdaauthorizercodeproarch:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName:  lambdaauthcode1
+      BucketName:  lambdaauthcode123
 
   #s3 bucket policy used by cloud front
 
@@ -107,7 +107,7 @@ Resources:
   BasicAuthorizerFunction:    #lambda authorizer for apigateway root url of Cloud Front Distribution
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: s3://lambdaauthcode1/index.zip
+      CodeUri: s3://lambdaauthcode123/index.zip
       Handler: index.handler
       Runtime: nodejs18.x
 
