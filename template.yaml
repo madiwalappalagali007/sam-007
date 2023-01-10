@@ -5,7 +5,7 @@ Resources:
   MyWAFACL:
     Type: AWS::WAFv2::WebACL
     Properties:
-      Name: WebACLforproarch123
+      Name: ExampleWebACLproarch13
       Description: This is an example WebACL
       Scope: CLOUDFRONT
       DefaultAction:
@@ -27,24 +27,22 @@ Resources:
             RateBasedStatement:
               Limit: 100
               AggregateKeyType: IP
-
-  # s3 Bucket static Website
-
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
       # Change bucket name to reflect your website
-      BucketName: s3proarch123.com
+      BucketName: minfypro.com
 
-  # s3 bucket for for lambda authorizer code
-
-  lambdaauthorizercodeproarch:
+  lambdaauthorizercodeproarch1:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName:  lambdaauthcode123
-
-  #s3 bucket policy used by cloud front
-
+      BucketName: proarch-bucket1
+#  MyObject:
+#   Type: AWS::S3::BucketObject
+#   Properties:
+#     Bucket: !Ref lambdaauthorizercodeproarch1
+#     Key: index.zip
+#      File: index.zip
   S3BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -59,13 +57,6 @@ Resources:
               - !Sub "arn:aws:s3:::${S3Bucket}/*"
             Principal:
               AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginAccessIdentity}"
-
-  #cloudfront origin access identity
-
-  # An origin access identity is a special CloudFront user that you can associate with Amazon S3 origins,
-  #so that you can secure all or just some of your Amazon S3 content.
-
-
   CloudFrontOriginAccessIdentity:
     Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
     Properties:
@@ -103,23 +94,19 @@ Resources:
             QueryString: false
           TargetOriginId: s3-website
           ViewerProtocolPolicy : redirect-to-https
-
   BasicAuthorizerFunction:    #lambda authorizer for apigateway root url of Cloud Front Distribution
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: s3://lambdaauthcode123/index.zip
+      CodeUri: s3://proarch-bucket1/index.zip
       Handler: index.handler
       Runtime: nodejs18.x
 
-   # REST API creation
-
+   # REST API
   ProdApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: apigw-s3-proxy
       Description: S3 integraton REST API demo
-
-  #Rest Api resource for Creating a resourcefolder
 
   ResourceFolder:
     Type: AWS::ApiGateway::Resource
@@ -128,16 +115,12 @@ Resources:
       ParentId: !GetAtt ProdApi.RootResourceId
       PathPart: '{folder}'
 
-  #Rest Api Resource for resource item
-
   ResourceItem:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref ProdApi
       ParentId: !Ref ResourceFolder
       PathPart: '{item}'
-
-  #Resource for attaching lambda authorizer with authorizer resource
 
   Authorizer:
     Type: 'AWS::ApiGateway::Authorizer'
@@ -156,9 +139,6 @@ Resources:
       IdentitySource: method.request.header.Auth
       Name: DefaultAuthorizer
       RestApiId: !Ref ProdApi
-
-
-  #Rest API resource for Root method " / "
 
   RootMethodGet:
     Type: AWS::ApiGateway::Method
@@ -194,8 +174,6 @@ Resources:
             method.response.header.Timestamp: true
         - StatusCode: 400
         - StatusCode: 500
-
-
   ItemMethodPUT:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -221,9 +199,6 @@ Resources:
         - StatusCode: 200
           ResponseModels:
             application/json: Empty
-
-  # Rest Api Deployment
-
   Deployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -251,3 +226,59 @@ Resources:
           Action:
           - sts:AssumeRole
       Path: "/"
+  ETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Command:
+        Name: glueetl
+        ScriptLocation: s3://proarch-bucket1/data.json
+      DefaultArguments:
+        --TempDir: s3://my-temp-dir
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      MaxRetries: 3
+      Name:  proarch-etljob13
+      Role: arn:aws:iam::753148611660:role/GlueServiceRole
+      Timeout: 2880
+      GlueVersion: '2.0'
+
+  ETLTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Type: SCHEDULED
+      Schedule: rate(5 minutes)
+      Actions:
+        - JobName: !Ref ETLJob
+
+  ETLS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: targetbucket1-proarch
+
+  ETLLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://proarch-bucket1/lambda.zip
+      Handler: index.handler
+      Runtime: python3.8
+      Timeout: 30
+      Events:
+        S3Trigger:
+          Type: S3
+          Properties:
+            Bucket: !Ref ETLS3Bucket
+            Events: s3:ObjectCreated:*
+
+  ETLDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      TableName:  proarch-db
